@@ -1,0 +1,84 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.18;
+
+contract ArraysExercise {
+    uint[] public numbers = [1,2,3,4,5,6,7,8,9,10];
+    address[] public senders;
+    uint[] public timestamps;
+
+    /**
+     * @notice Returns the entire `numbers` array.
+     * @return An array of uint256 containing the numbers 1-10.
+     */
+    function getNumbers() public view returns (uint[] memory) {
+        return numbers;
+    }
+
+    /**
+     * @notice Resets the `numbers` array to its initial state (1-10).
+     */
+    function resetNumbers() public {
+        delete numbers;
+        numbers = [1,2,3,4,5,6,7,8,9,10];
+    }
+
+    /**
+     * @notice Appends an array of numbers to the `numbers` array.
+     * @param _toAppend The array of numbers to append to the `numbers` array.
+     */
+    function appendToNumbers(uint[] calldata _toAppend) public {
+        uint len = _toAppend.length;
+        for (uint i = 0; i < len; i++) {
+            numbers.push(_toAppend[i]);
+        }
+    }
+
+    /**
+     * @notice Saves the timestamp and sender's address.
+     * @param _unixTimestamp The UNIX timestamp to save.
+     */
+    function saveTimestamp(uint _unixTimestamp) public {
+        senders.push(msg.sender);
+        timestamps.push(_unixTimestamp);
+    }
+
+    /**
+     * @notice Returns all timestamps after January 1, 2000, 12:00am and corresponding senders.
+     * @return recentTimestamps An array of timestamps after January 1, 2000.
+     * @return recentSenders An array of addresses corresponding to the recent timestamps.
+     */
+    function afterY2K() public view returns (uint[] memory recentTimestamps, address[] memory recentSenders) {
+        uint count = 0;
+        for (uint i = 0; i < timestamps.length; i++) {
+            if (timestamps[i] > 946702800) {
+                count++;
+            }
+        }
+
+        recentTimestamps = new uint[](count);
+        recentSenders = new address[](count);
+
+        uint j = 0;
+        for (uint i = 0; i < timestamps.length; i++) {
+            if (timestamps[i] > 946702800) {
+                recentTimestamps[j] = timestamps[i];
+                recentSenders[j] = senders[i];
+                j++;
+            }
+        }
+    }
+
+    /**
+     * @notice Resets the `senders` array.
+     */
+    function resetSenders() public {
+        delete senders;
+    }
+
+    /**
+     * @notice Resets the `timestamps` array.
+     */
+    function resetTimestamps() public {
+        delete timestamps;
+    }
+}
