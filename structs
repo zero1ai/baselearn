@@ -1,0 +1,86 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract GarageManager {
+    struct Car {
+        string make;
+        string model;
+        string color;
+        uint256 numberOfDoors;
+    }
+
+    mapping(address => Car[]) public garage;
+
+    error BadCarIndex(uint256 index);
+
+    /**
+     * @dev Adds a new car to the sender's garage.
+     * @param _make The make of the car.
+     * @param _model The model of the car.
+     * @param _color The color of the car.
+     * @param _numberOfDoors The number of doors the car has.
+     */
+    function addCar(
+        string memory _make,
+        string memory _model,
+        string memory _color,
+        uint256 _numberOfDoors
+    ) public {
+        Car memory newCar = Car({
+            make: _make,
+            model: _model,
+            color: _color,
+            numberOfDoors: _numberOfDoors
+        });
+        garage[msg.sender].push(newCar);
+    }
+
+    /**
+     * @dev Returns all cars owned by the sender.
+     * @return An array of Car structs.
+     */
+    function getMyCars() public view returns (Car[] memory) {
+        return garage[msg.sender];
+    }
+
+    /**
+     * @dev Returns all cars owned by a specific user.
+     * @param user The address of the user.
+     * @return An array of Car structs.
+     */
+    function getUserCars(address user) public view returns (Car[] memory) {
+        return garage[user];
+    }
+
+    /**
+     * @dev Updates a car at a specific index in the sender's garage.
+     * @param index The index of the car to update.
+     * @param _make The new make of the car.
+     * @param _model The new model of the car.
+     * @param _color The new color of the car.
+     * @param _numberOfDoors The new number of doors the car has.
+     */
+    function updateCar(
+        uint256 index,
+        string memory _make,
+        string memory _model,
+        string memory _color,
+        uint256 _numberOfDoors
+    ) public {
+        if (index >= garage[msg.sender].length) {
+            revert BadCarIndex(index);
+        }
+        Car storage carToUpdate = garage[msg.sender][index];
+        carToUpdate.make = _make;
+        carToUpdate.model = _model;
+        carToUpdate.color = _color;
+        carToUpdate.numberOfDoors = _numberOfDoors;
+    }
+
+    /**
+     * @dev Resets the sender's garage by deleting all their cars.
+     */
+    function resetMyGarage() public {
+        delete garage[msg.sender];
+    }
+}
