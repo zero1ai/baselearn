@@ -1,0 +1,135 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.16;
+
+// Import OpenZeppelin's Ownable contract
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+/**
+ * @title AddressBook
+ * @dev A contract that allows users to add, remove, and view contacts.
+ */
+contract AddressBook is Ownable {
+    struct Contact {
+        uint id;
+        string firstName;
+        string lastName;
+        uint[] phoneNumbers;
+        string additionalStorage;
+    }
+
+    // Mapping from ID to Contact
+    mapping(uint => Contact) private contacts;
+    uint private nextId = 1;
+
+    // Custom error for when a contact is not found
+    error ContactNotFound(uint256 id);
+
+    // **Constructor**
+    constructor() Ownable(msg.sender) {
+        // Additional initialization if needed
+    }
+
+    /**
+     * @dev Adds a new contact. Only the owner can call this function.
+     * @param _firstName The first name of the contact.
+     * @param _lastName The last name of the contact.
+     * @param _phoneNumbers An array of phone numbers.
+     */
+    function addContact(
+        string calldata _firstName,
+        string calldata _lastName,
+        uint[] calldata _phoneNumbers,
+        string calldata _additionalStorage
+    ) external onlyOwner {
+        contacts[nextId] = Contact({
+            id: nextId,
+            firstName: _firstName,
+            lastName: _lastName,
+            phoneNumbers: _phoneNumbers,
+            additionalStorage: _additionalStorage
+        });
+        nextId++;
+    }
+
+    /**
+     * @dev Deletes a contact by ID. Only the owner can call this function.
+     * @param _id The ID of the contact to delete.
+     */
+    function deleteContact(uint _id) external onlyOwner {
+        if (contacts[_id].id == 0) {
+            revert ContactNotFound(_id);
+        }
+        delete contacts[_id];
+    }
+
+    /**
+     * @dev Retrieves a contact's information by ID.
+     * @param _id The ID of the contact to retrieve.
+     * @return id The ID of the contact.
+     * @return firstName The first name of the contact.
+     * @return lastName The last name of the contact.
+     * @return phoneNumbers An array of the contact's phone numbers.
+     */
+    function getContact(uint _id)
+        external
+        view
+        returns (
+            uint id,
+            string memory firstName,
+            string memory lastName,
+            uint[] memory phoneNumbers
+        )
+    {
+        if (contacts[_id].id == 0) {
+            revert ContactNotFound(_id);
+        }
+        Contact storage contact = contacts[_id];
+        return (
+            contact.id,
+            contact.firstName,
+            contact.lastName,
+            contact.phoneNumbers
+        );
+    }
+
+    /**
+     * @dev Returns all existing contacts.
+     * @return allContacts An array of all contacts.
+     */
+    function getAllContacts() external view returns (Contact[] memory allContacts) {
+        uint256 totalContacts = nextId - 1;
+        uint256 count = 0;
+
+        // Count existing contacts
+        for (uint i = 1; i <= totalContacts; i++) {
+            if (contacts[i].id != 0) {
+                count++;
+            }
+        }
+
+        // Collect contacts
+        allContacts = new Contact[](count);
+        uint index = 0;
+        for (uint i = 1; i <= totalContacts; i++) {
+            if (contacts[i].id != 0) {
+                allContacts[index] = contacts[i];
+                index++;
+            }
+        }
+    }
+}
+
+/**
+ * @title AddressBookFactory
+ * @dev A factory contract to deploy AddressBook instances.
+ */
+contract AddressBookFactory {
+    /**
+     * @dev Deploys a new AddressBook contract and transfers ownership to the caller.
+     * @return newAddressBook The address of the newly deployed AddressBook.
+     */
+    function deploy() external returns (AddressBook newAddressBook) {
+        newAddressBook = new AddressBook();
+        newAddressBook.transferOwnership(msg.sender);
+    }
+}
