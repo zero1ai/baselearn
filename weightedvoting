@@ -1,0 +1,170 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.16;
+
+// Import OpenZeppelin Contracts
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+
+// Custom Errors
+error TokensClaimed();
+error AllTokensClaimed();
+error NoTokensHeld();
+error QuorumTooHigh(uint256 quorum);
+error AlreadyVoted();
+error VotingClosed();
+
+contract WeightedVoting is ERC20 {
+    using EnumerableSet for EnumerableSet.AddressSet;
+
+    uint256 public maxSupply;
+    uint256 public totalClaimed;
+
+    // Enum for Vote Options
+    enum Votes { AGAINST, FOR, ABSTAIN }
+
+    // Struct for an Issue
+    struct Issue {
+        EnumerableSet.AddressSet voters;
+        string issueDesc;
+        uint256 votesFor;
+        uint256 votesAgainst;
+        uint256 votesAbstain;
+        uint256 totalVotes;
+        uint256 quorum;
+        bool isPassed;
+        bool isClosed;
+    }
+
+    // Struct for returning Issue data
+    struct ReturnableIssue {
+        address[] voters;
+        string issueDesc;
+        uint256 votesFor;
+        uint256 votesAgainst;
+        uint256 votesAbstain;
+        uint256 totalVotes;
+        uint256 quorum;
+        bool isPassed;
+        bool isClosed;
+    }
+
+    // Array of Issues
+    Issue[] internal issues;
+
+    // Mapping to track if an address has claimed tokens
+    mapping(address => bool) public tokensClaimed;
+
+    /// @dev Constructor initializes the ERC20 token and sets the max supply
+    constructor(string memory _name, string memory _symbol) ERC20(_name, _symbol) {
+        maxSupply = 1000000;
+        issues.push(); // Burn the zeroeth element
+    }
+
+    /**
+     * @notice Allows an address to claim 100 tokens if they haven't already
+     */
+    function claim() external {
+        if (totalClaimed + 100 > maxSupply) {
+            revert AllTokensClaimed();
+        }
+        if (tokensClaimed[msg.sender]) {
+            revert TokensClaimed();
+        }
+
+        _mint(msg.sender, 100);
+        totalClaimed += 100;
+        tokensClaimed[msg.sender] = true;
+    }
+
+    /**
+     * @notice Allows a token holder to create a new issue
+     * @param _issueDesc The description of the issue
+     * @param _quorum The number of votes needed to close the issue
+     * @return The index of the newly created issue
+     */
+    function createIssue(string memory _issueDesc, uint256 _quorum) external returns (uint256) {
+        if (balanceOf(msg.sender) == 0) {
+            revert NoTokensHeld();
+        }
+        if (_quorum > totalClaimed) {
+            revert QuorumTooHigh(_quorum);
+        }
+
+        uint256 newIssueIndex = issues.length;
+        issues.push();
+        Issue storage newIssue = issues[newIssueIndex];
+        newIssue.issueDesc = _issueDesc;
+        newIssue.quorum = _quorum;
+
+        return newIssueIndex;
+    }
+
+    /**
+     * @notice Retrieves all data for a specific issue
+     * @param _issueId The ID of the issue to retrieve
+     * @return A ReturnableIssue struct containing the issue's details
+     */
+    function getIssue(uint256 _issueId) external view returns (ReturnableIssue memory) {
+        Issue storage issue = issues[_issueId];
+
+        address[] memory issueVoters = new address[](issue.voters.length());
+        for (uint256 i = 0; i < issue.voters.length(); i++) {
+            issueVoters[i] = issue.voters.at(i);
+        }
+
+        ReturnableIssue memory result;
+        result.voters = issueVoters;
+        result.issueDesc = issue.issueDesc;
+        result.votesFor = issue.votesFor;
+        result.votesAgainst = issue.votesAgainst;
+        result.votesAbstain = issue.votesAbstain;
+        result.totalVotes = issue.totalVotes;
+        result.quorum = issue.quorum;
+        result.isPassed = issue.isPassed;
+        result.isClosed = issue.isClosed;
+
+        return result;
+    }
+
+    /**
+     * @notice Allows a token holder to vote on an issue
+     * @param _issueId The ID of the issue to vote on
+     * @param _vote The vote option (AGAINST, FOR, ABSTAIN)
+     */
+    function vote(uint256 _issueId, Votes _vote) external {
+        Issue storage issue = issues[_issueId];
+
+        if (issue.isClosed) {
+            revert VotingClosed();
+        }
+        if (issue.voters.contains(msg.sender)) {
+            revert AlreadyVoted();
+        }
+        if (balanceOf(msg.sender) == 0) {
+            revert NoTokensHeld();
+        }
+
+        uint256 voterBalance = balanceOf(msg.sender);
+
+        // Update vote counts based on the vote option
+        if (_vote == Votes.FOR) {
+            issue.votesFor += voterBalance;
+        } else if (_vote == Votes.AGAINST) {
+            issue.votesAgainst += voterBalance;
+        } else if (_vote == Votes.ABSTAIN) {
+            issue.votesAbstain += voterBalance;
+        }
+
+        issue.totalVotes += voterBalance;
+        issue.voters.add(msg.sender);
+
+        // Close the issue if quorum is reached and determine if it passed
+        if (issue.totalVotes >= issue.quorum) {
+            issue.isClosed = true;
+
+            if (issue.votesFor > issue.votesAgainst) {
+                issue.isPassed = true;
+            }
+        }
+    }
+}
