@@ -1,0 +1,92 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.16;
+
+// Custom Errors
+error HaikuNotUnique();
+error NotYourHaiku(uint256 haikuId);
+error NoHaikusShared();
+
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+
+contract HaikuNFT is ERC721 {
+    // Struct to store haiku data
+    struct Haiku {
+        address author;
+        string line1;
+        string line2;
+        string line3;
+    }
+
+    // Public array to store haikus
+    Haiku[] public haikus;
+
+    // Mapping to relate shared haikus: recipient address => array of haiku IDs
+    mapping(address => uint256[]) public sharedHaikus;
+
+    // Public counter for haiku IDs
+    uint256 public counter;
+
+    constructor() ERC721("HaikuNFT", "HAIKU") {
+        counter = 1; // Start counter at 1 to avoid ID 0
+    }
+
+    // Function to mint a new haiku NFT
+    function mintHaiku(string memory _line1, string memory _line2, string memory _line3) external {
+        string[3] memory newLines = [_line1, _line2, _line3];
+
+        for (uint256 i = 0; i < haikus.length; i++) {
+            Haiku storage existingHaiku = haikus[i];
+            string[3] memory existingLines = [existingHaiku.line1, existingHaiku.line2, existingHaiku.line3];
+
+            for (uint256 j = 0; j < 3; j++) {
+                for (uint256 k = 0; k < 3; k++) {
+                    if (keccak256(abi.encodePacked(newLines[j])) == keccak256(abi.encodePacked(existingLines[k]))) {
+                        revert HaikuNotUnique();
+                    }
+                }
+            }
+        }
+
+        // Create a new haiku and add it to the array
+        haikus.push(Haiku({
+            author: msg.sender,
+            line1: _line1,
+            line2: _line2,
+            line3: _line3
+        }));
+
+        // Mint the NFT to the sender with the current counter as the token ID
+        _safeMint(msg.sender, counter);
+
+        // Increment the counter for the next haiku
+        counter++;
+    }
+
+    // Function to share a haiku with another address
+    function shareHaiku(address _to, uint256 _haikuId) public {
+        // Check if the sender owns the haiku
+        if (ownerOf(_haikuId) != msg.sender) {
+            revert NotYourHaiku(_haikuId);
+        }
+
+        // Add the haiku ID to the sharedHaikus mapping for the recipient
+        sharedHaikus[_to].push(_haikuId);
+    }
+
+    // Function to get haiku IDs shared with the caller
+    function getMySharedHaikus() public view returns (uint256[] memory) {
+        uint256[] memory sharedIds = sharedHaikus[msg.sender];
+
+        if (sharedIds.length == 0) {
+            revert NoHaikusShared();
+        }
+
+        return sharedIds;
+    }
+
+    // Function to retrieve a haiku by its ID
+    function getHaiku(uint256 _haikuId) public view returns (Haiku memory) {
+        require(_haikuId > 0 && _haikuId < counter, "Invalid haiku ID");
+        return haikus[_haikuId - 1];
+    }
+}
